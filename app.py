@@ -1,10 +1,12 @@
 import streamlit as st
+import pandas as pd
 import time
+from datetime import datetime
 
-# Configuración de página
+# --- CONFIGURACIÓN ---
 st.set_page_config(page_title="Ideal Fruits", layout="centered")
 
-# --- ESTILO VISUAL ---
+# Estilo visual (Botella de fondo y botones grandes)
 folder_path = "Vermth%20de%20la%20aplicaci%C3%B3n"
 st.markdown(f"""
     <style>
@@ -12,14 +14,12 @@ st.markdown(f"""
         background: linear-gradient(rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0.7)), 
                     url("https://raw.githubusercontent.com/JJMG478/App-vermth/main/{folder_path}/1758951782602.jpg");
         background-size: cover;
-        background-position: center;
     }}
     .stButton > button {{
         width: 100%; height: 70px; font-size: 20px !important;
         font-weight: bold; border-radius: 12px; margin-bottom: 10px;
         color: white; border: none;
     }}
-    /* Colores de los botones del menú */
     div.stButton:nth-child(3) > button {{ background-color: #2e4a7d; }}
     div.stButton:nth-child(4) > button {{ background-color: #3e5c3e; }}
     div.stButton:nth-child(5) > button {{ background-color: #d17a2d; }}
@@ -27,64 +27,71 @@ st.markdown(f"""
     </style>
 """, unsafe_allow_html=True)
 
-# --- PANTALLA DE CARGA ---
-if 'cargado' not in st.session_state:
-    placeholder = st.empty()
-    with placeholder.container():
-        st.image("Vermth de la aplicación/Logotipo-ideal-fruits.png", use_container_width=True)
-        time.sleep(4)
-    st.session_state.cargado = True
-    placeholder.empty()
+# Base de datos temporal (en la sesión del móvil)
+if 'historial_ventas' not in st.session_state:
+    st.session_state.historial_ventas = []
 
-# --- INICIALIZACIÓN DE DATOS ---
+# --- NAVEGACIÓN ---
 if 'seccion' not in st.session_state:
     st.session_state.seccion = 'menu'
 
-# Tarifas de ejemplo (puedes ajustarlas en el menú 3 después)
-tarifas = {
-    "75cl": {"Distribuidor": 10.20, "Horeca": 12.00, "Particular": 13.40},
-    "25cl": {"Distribuidor": 5.00, "Horeca": 6.00, "Particular": 6.50}
-}
-
-# --- NAVEGACIÓN ---
+# --- MENÚ PRINCIPAL ---
 if st.session_state.seccion == 'menu':
     st.image("Vermth de la aplicación/Logotipo-ideal-fruits.png", width=120)
-    st.title("Panel de Gestión")
+    st.title("Ideal Fruits - Gestión")
     
-    if st.button("1. Gestionar Nuevo Pedido"):
+    if st.button("🛒 1. Gestionar Nuevo Pedido"):
         st.session_state.seccion = 'pedido'
         st.rerun()
     
-    if st.button("2. Ver Stocks y Costes Actuales"):
-        st.info("Sección en desarrollo")
+    if st.button("📦 2. Ver Resumen de Ventas"):
+        st.session_state.seccion = 'resumen'
+        st.rerun()
         
-    if st.button("3. Ajustar Stocks, Costes y Tarifas"):
-        st.info("Sección en desarrollo")
-        
-    if st.button("4. Salir"):
+    st.button("⚙️ 3. Ajustar Tarifas (Próximamente)")
+    
+    if st.button("❌ 4. Salir"):
         st.session_state.clear()
         st.rerun()
 
+# --- SECCIÓN: NUEVO PEDIDO ---
 elif st.session_state.seccion == 'pedido':
-    st.header("🛒 Nuevo Pedido")
+    st.header("Nuevo Pedido")
+    if st.button("⬅️ Volver"):
+        st.session_state.seccion = 'menu'
+        st.rerun()
+        
+    with st.form("venta"):
+        cliente = st.text_input("Nombre Cliente")
+        formato = st.selectbox("Formato", ["75cl", "25cl"])
+        tipo = st.selectbox("Tipo", ["Distribuidor", "Horeca", "Particular"])
+        cantidad = st.number_input("Botellas", min_value=1, value=6)
+        precio = st.number_input("Precio Unitario (€)", value=12.0)
+        
+        if st.form_submit_button("✅ REGISTRAR VENTA"):
+            nueva_venta = {
+                "Fecha": datetime.now().strftime("%d/%m/%Y %H:%M"),
+                "Cliente": cliente,
+                "Formato": formato,
+                "Cantidad": cantidad,
+                "Total": cantidad * precio
+            }
+            st.session_state.historial_ventas.append(nueva_venta)
+            st.success("¡Venta guardada con éxito!")
+            time.sleep(1)
+            st.session_state.seccion = 'menu'
+            st.rerun()
+
+# --- SECCIÓN: RESUMEN ---
+elif st.session_state.seccion == 'resumen':
+    st.header("📊 Resumen de Hoy")
     if st.button("⬅️ Volver"):
         st.session_state.seccion = 'menu'
         st.rerun()
     
-    with st.form("form_pedido"):
-        cliente = st.text_input("Cliente")
-        formato = st.selectbox("Formato", ["75cl", "25cl"])
-        tipo = st.selectbox("Tipo de Cliente", ["Distribuidor", "Horeca", "Particular"])
-        cantidad = st.number_input("Cantidad de botellas", min_value=1, step=1)
-        
-        precio_sugerido = tarifas[formato][tipo]
-        st.write(f"**Precio Tarifa:** {precio_sugerido}€")
-        precio_final = st.number_input("Precio Final Unitario (€)", value=float(precio_sugerido))
-        
-        enviado = st.form_submit_button("Confirmar y Guardar")
-        if enviado:
-            total = precio_final * cantidad
-            st.success(f"¡Venta registrada! Total: {total:.2f}€")
-            time.sleep(2)
-            st.session_state.seccion = 'menu'
-            st.rerun()
+    if st.session_state.historial_ventas:
+        df = pd.DataFrame(st.session_state.historial_ventas)
+        st.table(df)
+        st.write(f"**Total Recaudado: {df['Total'].sum():.2f}€**")
+    else:
+        st.warning("No hay ventas registradas todavía.")
